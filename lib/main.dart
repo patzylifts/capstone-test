@@ -8,6 +8,8 @@ import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:flutter/services.dart';
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:path/path.dart';
+import 'package:path_provider/path_provider.dart';
 
 late List<CameraDescription> cameras;
 
@@ -51,11 +53,14 @@ class _MyHomePageState extends State<MyHomePage> {
   //TODO code to initialize the camera feed
   initializeCamera() async {
     //TODO initialize detector
-    const mode = DetectionMode.stream;
-    // Options to configure the detector while using with base model.
-    final options = ObjectDetectorOptions(
-        mode: mode, classifyObjects: true, multipleObjects: true);
-    objectDetector = ObjectDetector(options: options);
+    // const mode = DetectionMode.stream;
+    // // Options to configure the detector while using with base model.
+    // final options = ObjectDetectorOptions(
+    //     mode: mode, classifyObjects: true, multipleObjects: true);
+    // objectDetector = ObjectDetector(options: options);
+
+    //Call a custom sign language detector model
+    loadModel();
 
     //TODO initialize controller
     controller = CameraController(cameras[0], ResolutionPreset.high);
@@ -70,6 +75,28 @@ class _MyHomePageState extends State<MyHomePage> {
     });
   }
 
+  loadModel() async {
+    final modelPath = await getModelPath('assets/ml/fruits_tm.tflite');
+    final options = LocalObjectDetectorOptions(
+      mode: DetectionMode.stream,
+      modelPath: modelPath,
+      classifyObjects: true,
+      multipleObjects: false,
+    );
+     objectDetector = ObjectDetector(options: options);
+  }
+  Future<String> getModelPath(String asset) async {
+    final path = '${(await getApplicationSupportDirectory()).path}/$asset';
+    await Directory(dirname(path)).create(recursive: true);
+    final file = File(path);
+    if (!await file.exists()) {
+      final byteData = await rootBundle.load(asset);
+      await file.writeAsBytes(byteData.buffer
+          .asUint8List(byteData.offsetInBytes, byteData.lengthInBytes));
+    }
+    return file.path;
+  }
+
   //close all resources
   @override
   void dispose() {
@@ -82,11 +109,11 @@ class _MyHomePageState extends State<MyHomePage> {
   dynamic _scanResults;
   CameraImage? img;
   doObjectDetectionOnFrame() async {
-    // var frameImg = _inputImageFromCameraImage(img!);
-    // List<DetectedObject> objects = await objectDetector.processImage(frameImg);
-    // print("len= ${objects.length}");
+     var frameImg = _inputImageFromCameraImage(img!);
+     List<DetectedObject> objects = await objectDetector.processImage(frameImg);
+     print("len= ${objects.length}");
     setState(() {
-      //  _scanResults = objects;
+        _scanResults = objects;
       isBusy = false;
     });
 
@@ -191,19 +218,19 @@ class _MyHomePageState extends State<MyHomePage> {
         ),
       );
 
-      // stackChildren.add(
-      //   Positioned(
-      //       top: 0.0,
-      //       left: 0.0,
-      //       width: size.width,
-      //       height: size.height,
-      //       child: buildResult()),
-      // );
+       stackChildren.add(
+        Positioned(
+             top: 0.0,
+             left: 0.0,
+             width: size.width,
+             height: size.height,
+             child: buildResult()),
+       );
     }
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text("Object detector"),
+        title: const Text("Sign Language detector"),
         backgroundColor: Colors.pinkAccent,
       ),
       backgroundColor: Colors.black,
@@ -244,23 +271,23 @@ class ObjectDetectorPainter extends CustomPainter {
         paint,
       );
 
-      // var list = detectedObject.labels;
-      // for (Label label in list) {
-      //   print("${label.text}   ${label.confidence.toStringAsFixed(2)}");
-      //   TextSpan span = TextSpan(
-      //       text: label.text,
-      //       style: const TextStyle(fontSize: 25, color: Colors.blue));
-      //   TextPainter tp = TextPainter(
-      //       text: span,
-      //       textAlign: TextAlign.left,
-      //       textDirection: TextDirection.ltr);
-      //   tp.layout();
-      //   tp.paint(
-      //       canvas,
-      //       Offset(detectedObject.boundingBox.left * scaleX,
-      //           detectedObject.boundingBox.top * scaleY));
-      //   break;
-      // }
+       var list = detectedObject.labels;
+       for (Label label in list) {
+        print("${label.text}   ${label.confidence.toStringAsFixed(2)}");
+        TextSpan span = TextSpan(
+            text: label.text,
+            style: const TextStyle(fontSize: 25, color: Colors.blue));
+        TextPainter tp = TextPainter(
+            text: span,
+            textAlign: TextAlign.left,
+            textDirection: TextDirection.ltr);
+        tp.layout();
+        tp.paint(
+            canvas,
+            Offset(detectedObject.boundingBox.left * scaleX,
+                detectedObject.boundingBox.top * scaleY));
+        break;
+      }
     }
   }
 
